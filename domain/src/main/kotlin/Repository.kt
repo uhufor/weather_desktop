@@ -37,11 +37,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
  ***/
 
+import arrow.core.Either
+import arrow.core.continuations.either
+import arrow.core.left
+import arrow.core.right
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.json.serializer.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.Json
 
 class Repository(
     private val apiKey: String,
@@ -49,33 +55,33 @@ class Repository(
 ) {
     private val transformer: WeatherTransformer = WeatherTransformer()
 
-    private suspend fun getWeatherForCity(city: String): WeatherResponse =
-        client.get(
-            "https://api.weatherapi.com/v1/forecast.json" +
+    private suspend fun getWeatherForCity(city: String): Either<Throwable, WeatherResponse> {
+        return try {
+            val urlString = "https://api.weatherapi.com/v1/forecast.json" +
                     "?key=$apiKey" +
                     "&q=$city" +
                     "&days=5" +
                     "&aqi=no" +
                     "&alerts=no"
-        )
-
-    suspend fun weatherForCity(city: String): Lce<WeatherResults> {
-        return try {
-            val result = getWeatherForCity(city)
-            val content = transformer.transform(result)
-            Lce.Content(content)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Lce.Error(e)
+            val response: WeatherResponse = client.get(urlString).body()
+            response.right()
+        } catch (e: Throwable) {
+            e.left()
         }
     }
 
+    suspend fun weatherForCity(city: String): Either<Throwable, WeatherResults> =
+        either {
+            val result = getWeatherForCity(city).bind()
+            val content = transformer.transform(result).bind()
+            content
+        }
 
     companion object {
         val defaultHttpClient = HttpClient(CIO) {
-            install(JsonFeature) {
-                serializer = KotlinxSerializer(
-                    json = kotlinx.serialization.json.Json {
+            install(ContentNegotiation) {
+                json(
+                    Json {
                         ignoreUnknownKeys = true
                     }
                 )

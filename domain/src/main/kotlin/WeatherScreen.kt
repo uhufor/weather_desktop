@@ -12,12 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import arrow.core.Either
 import kotlinx.coroutines.launch
 
 @Composable
 fun WeatherScreen(repository: Repository) {
     var queriedCity by remember { mutableStateOf("") }
-    var weatherState by remember { mutableStateOf<Lce<WeatherResults>?>(null) }
+    var weatherState by remember { mutableStateOf<Either<Throwable, WeatherResults>?>(null) }
     val scope = rememberCoroutineScope()
 
     Column {
@@ -38,7 +39,7 @@ fun WeatherScreen(repository: Repository) {
             )
             Button(
                 onClick = {
-                    weatherState = Lce.Loading
+//                    weatherState = Lce.Loading
                     scope.launch {
                         weatherState = repository.weatherForCity(queriedCity)
                     }
@@ -47,10 +48,14 @@ fun WeatherScreen(repository: Repository) {
                 Icon(Icons.Outlined.Search, "Search")
             }
         }
+//        when (val state = weatherState) {
+//            is Lce.Loading -> LoadingUI()
+//            is Lce.Error -> ErrorUI()
+//            is Lce.Content -> ContentUI(state.data)
+//        }
         when (val state = weatherState) {
-            is Lce.Loading -> LoadingUI()
-            is Lce.Error -> ErrorUI()
-            is Lce.Content -> ContentUI(state.data)
+            is Either.Left -> ErrorUI()
+            is Either.Right -> ContentUI(state.value)
         }
     }
 }
